@@ -54,3 +54,9 @@ def run_db_migration():
     magnum.restart_all()
     reactive.set_state('db.synced')
     magnum.assess_status()
+
+
+@reactive.when('ha.connected')
+def cluster_connected(hacluster):
+    magnum.configure_ha_resources(hacluster)
+

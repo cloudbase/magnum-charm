@@ -31,6 +31,10 @@ def db_sync():
     MagnumCharm.singleton.db_sync()
 
 
+def configure_ha_resources(hacluster):
+    MagnumCharm.singleton.configure_ha_resources(hacluster)
+
+
 def assess_status():
     MagnumCharm.singleton.assess_status()
 
