@@ -230,6 +230,7 @@ class GitInstaller(charms_openstack.charm.HAOpenStackCharm):
         "libffi-dev",
         "gettext",
         "build-essential",
+        "haproxy",
     ]
     abstract_class = True
 
@@ -285,6 +286,7 @@ class GitInstaller(charms_openstack.charm.HAOpenStackCharm):
             return
         subprocess.check_call(["/usr/bin/python3", "-m", "venv", self._venv_path])
         self._venv_helper.pip_install(["wheel", "pip"], update=True)
+        self._venv_helper.pip_install(["python-memcached", "mysqlclient"], update=True)
         return
 
     def _ensure_repo(self):

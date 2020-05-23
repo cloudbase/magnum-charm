@@ -61,3 +61,11 @@ options:
     type: string
     default: magnum_domain_admin
     description: Domain admin for the trustee-domain
+  cert-manager-type:
+    type: string
+    default: barbican
+    description: |
+      Certificate Manager plugin. Use barbican in production. Requires barbican
+      to be present in your OpenStack deployment. Choices are:
+        * x509keypair
+        * barbican
