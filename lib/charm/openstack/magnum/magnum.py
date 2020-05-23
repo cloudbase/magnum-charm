@@ -13,6 +13,7 @@ import pwd
 
 import charmhelpers.core.hookenv as hookenv
 
+from charms_openstack.charm import core
 import charms_openstack.charm
 import charms_openstack.adapters
 import charms_openstack.ip as os_ip
@@ -37,16 +38,21 @@ MAGNUM_GROUP = "magnum"
 OPENSTACK_RELEASE_KEY = 'magnum-charm.openstack-release-version'
 INSTALL_TYPE_ARCHIVE = "archive"
 INSTALL_TYPE_GIT = "git"
-OPENSTACK_DEFAULT_BRANCH = "master"
+OPENSTACK_DEFAULT_BRANCH = "stable/train"
 INSTALL_PREFIX = "/opt/magnum"
 VENV_DIR_PREFIX = os.path.join(INSTALL_PREFIX, "venvs")
 DATA_DIR = os.path.join(INSTALL_PREFIX, "data")
 CURRENT_VENV = os.path.join(INSTALL_PREFIX, "current")
 MAGNUM_DB_MANAGE = os.path.join(CURRENT_VENV, "bin/magnum-db-manage")
 DEFAULT_MAGNUM_REPO = "https://github.com/openstack/magnum"
+_MAGNUM_API = os.path.join(
+    CURRENT_VENV, "bin/magnum-api")
+_MAGNUM_CONDUCTOR = os.path.join(
+    CURRENT_VENV, "bin/magnum-conductor")
+_MAGNUM_DB_MANAGE = os.path.join(
+    CURRENT_VENV, "bin/magnum-db-manage")
 
 PACKAGE_CODENAMES = {
-    "6": "queens",
     "7": "rocky",
     "8": "stein",
     "9": "train",
@@ -85,10 +91,6 @@ WantedBy=multi-user.target
 
 _SYSTEMD_SVC_FILE_FORMAT = "/lib/systemd/system/%(service)s.service"
 
-# select the default release function
-charms_openstack.charm.use_defaults('charm.default-select-release')
-
-
 def db_sync_done():
     return MagnumCharm.singleton.db_sync_done()
 
@@ -120,6 +122,17 @@ def setup_endpoint(keystone):
                                 internal_ep,
                                 admin_ep)
 
+# select the default release function
+@core.register_os_release_selector
+def release_selector():
+    conf = hookenv.config()
+    branch = conf.get(
+        "openstack-install-branch",
+        OPENSTACK_DEFAULT_BRANCH).split("/")
+    if len(branch) == 0:
+        raise RuntimeError("missing branch")
+    return branch[-1]
+    
 
 class VenvHelper(object):
 
@@ -207,6 +220,7 @@ class GitInstaller(charms_openstack.charm.HAOpenStackCharm):
         "python-dev",
         "python3-dev",
         "python3-pip",
+        "python3-venv",
         "libssl-dev",
         "libxml2-dev",
         "libmysqlclient-dev",
@@ -217,6 +231,7 @@ class GitInstaller(charms_openstack.charm.HAOpenStackCharm):
         "gettext",
         "build-essential",
     ]
+    abstract_class = True
 
     def __init__(self, *args, **kw):
         super().__init__(*args, **kw)
@@ -224,15 +239,9 @@ class GitInstaller(charms_openstack.charm.HAOpenStackCharm):
         self._venv_helper = VenvHelper(self._venv_path)
         self._magnum_source = os.path.join(DATA_DIR, SERVICE_NAME)
         self._git = GitHelper(self._magnum_source)
-        self._magnum_api = os.path.join(
-            CURRENT_VENV, "bin/magnum-api")
-        self._magnum_conductor = os.path.join(
-            CURRENT_VENV, "bin/magnum-conductor")
-        self._magnum_db_manage = os.path.join(
-            CURRENT_VENV, "bin/magnum-db-manage")
         self._svc_map = {
-            MAGNUM_API_SVC: self._magnum_api,
-            MAGNUM_CONDUCTOR_SVC: self._magnum_conductor,
+            MAGNUM_API_SVC: _MAGNUM_API,
+            MAGNUM_CONDUCTOR_SVC: _MAGNUM_CONDUCTOR,
         }
 
     def _get_install_source(self):
@@ -250,13 +259,13 @@ class GitInstaller(charms_openstack.charm.HAOpenStackCharm):
 
     @property
     def _venv_name(self):
-        branch = self._magnum_branch()
+        branch = self._magnum_branch
         return "magnum-%s" % branch.replace("/", "-")
 
     @property
     def _venv_path(self):
         return os.path.join(
-            INSTALL_PREFIX, self._venv_name)
+            VENV_DIR_PREFIX, self._venv_name)
 
     @property
     def _project_repository(self):
@@ -274,7 +283,7 @@ class GitInstaller(charms_openstack.charm.HAOpenStackCharm):
     def _maybe_create_venv(self):
         if os.path.isdir(self._venv_path):
             return
-        subprocess.check_call(["python3", "-m", "venv", self._venv_path])
+        subprocess.check_call(["/usr/bin/python3", "-m", "venv", self._venv_path])
         self._venv_helper.pip_install(["wheel", "pip"], update=True)
         return
 
@@ -284,10 +293,10 @@ class GitInstaller(charms_openstack.charm.HAOpenStackCharm):
         self._git.pull()
 
     def _get_installed_version(self):
-        if os.path.isfile(self._magnum_api) is False:
+        if os.path.isfile(_MAGNUM_API) is False:
             return None
         ret = subprocess.check_output(
-            [self._magnum_api, "--version"])
+            [_MAGNUM_API, "--version"])
         ret_arr = ret.decode().splitlines()
         if len(ret_arr) == 0:
             return None
@@ -384,7 +393,7 @@ class GitInstaller(charms_openstack.charm.HAOpenStackCharm):
 class MagnumCharm(GitInstaller):
 
     abstract_class = False
-    release = 'queens'
+    release = 'train'
     name = 'magnum'
     packages = PACKAGES
     api_ports = {
@@ -397,7 +406,7 @@ class MagnumCharm(GitInstaller):
     service_type = 'magnum'
     default_service = 'magnum-api'
     services = MAGNUM_SERVICES
-    sync_cmd = [self._magnum_db_manage, 'upgrade']
+    sync_cmd = [_MAGNUM_DB_MANAGE, 'upgrade']
 
     required_relations = [
         'shared-db', 'amqp', 'identity-service', 'trustee-credentials']
@@ -415,7 +424,9 @@ class MagnumCharm(GitInstaller):
     # Package codename map for magnum-common
     package_codenames = {
         'magnum-common': collections.OrderedDict([
-            ('6', 'queens'),
+            ('9', 'train'),
+            ('10', 'ussuri'),
+
         ]),
     }
 
