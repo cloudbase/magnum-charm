@@ -18,6 +18,8 @@ import charms_openstack.charm
 import charms_openstack.adapters
 import charms_openstack.ip as os_ip
 from charms.layer import basic
+import charmhelpers.contrib.openstack.utils as os_utils
+
 
 PACKAGES = ['magnum-api', 'magnum-conductor', 'python-mysqldb']
 MAGNUM_DIR = '/etc/magnum/'
@@ -122,17 +124,10 @@ def setup_endpoint(keystone):
                                 internal_ep,
                                 admin_ep)
 
+
 # select the default release function
-@core.register_os_release_selector
-def release_selector():
-    conf = hookenv.config()
-    branch = conf.get(
-        "openstack-install-branch",
-        OPENSTACK_DEFAULT_BRANCH).split("/")
-    if len(branch) == 0:
-        raise RuntimeError("missing branch")
-    return branch[-1]
-    
+charms_openstack.charm.use_defaults('charm.default-select-release')
+
 
 class VenvHelper(object):
 
@@ -255,8 +250,11 @@ class GitInstaller(charms_openstack.charm.HAOpenStackCharm):
     @property
     def _magnum_branch(self):
         branch = self._config.get(
-            "openstack-install-branch", OPENSTACK_DEFAULT_BRANCH)
-        return branch
+            "openstack-origin")
+        if branch is None:
+            return OPENSTACK_DEFAULT_BRANCH
+        codename = os_utils.get_os_codename_install_source(branch)
+        return "stable/%s" % codename
 
     @property
     def _venv_name(self):
@@ -286,7 +284,8 @@ class GitInstaller(charms_openstack.charm.HAOpenStackCharm):
             return
         subprocess.check_call(["/usr/bin/python3", "-m", "venv", self._venv_path])
         self._venv_helper.pip_install(["wheel", "pip"], update=True)
-        self._venv_helper.pip_install(["python-memcached", "mysqlclient"], update=True)
+        self._venv_helper.pip_install(
+                ["python-memcached", "mysqlclient", "PyMySQL"], update=True)
         return
 
     def _ensure_repo(self):
