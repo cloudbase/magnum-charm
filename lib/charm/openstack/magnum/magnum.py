@@ -25,6 +25,8 @@ PACKAGES = ['magnum-api', 'magnum-conductor', 'python-mysqldb']
 MAGNUM_DIR = '/etc/magnum/'
 MAGNUM_CONF = os.path.join(MAGNUM_DIR, "magnum.conf")
 MAGNUM_PASTE_API = os.path.join(MAGNUM_DIR, "api-paste.ini")
+KEYSTONE_POLICY= os.path.join(MAGNUM_DIR, "keystone_auth_default_policy.json")
+POLICY = os.path.join(MAGNUM_DIR, "policy.json")
 SERVICE_NAME = "magnum"
 MAGNUM_BINARIES = [
     "magnum-api",
@@ -410,11 +412,13 @@ class MagnumCharm(GitInstaller):
     sync_cmd = [_MAGNUM_DB_MANAGE, 'upgrade']
 
     required_relations = [
-        'shared-db', 'amqp', 'identity-service', 'trustee-credentials']
+        'shared-db', 'amqp', 'identity-service']
 
     restart_map = {
         MAGNUM_CONF: services,
         MAGNUM_PASTE_API: [default_service,],
+        KEYSTONE_POLICY: services,
+        POLICY: services,
     }
 
     ha_resources = ['vips', 'haproxy']

@@ -1,9 +1,9 @@
 includes:
   - layer:openstack-api
+  - layer:leadership
   - interface:mysql-shared
   - interface:rabbitmq
   - interface:keystone
-  - interface:trustee
 repo: https://github.com/cloudbase/charm-magnum
 options:
   basic:
