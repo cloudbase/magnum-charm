@@ -6,9 +6,6 @@ Charm to deploy Magnum in a Canonical OpenStack deployment
 
 ## Build charm
 
-You will need to have the [trustee](https://github.com/gabriel-samfira/layer-trustee) interface copied in your ```$INTERFACE_PATH```.
-
-
 ```bash
 export CHARM_BASE="$HOME/work/charms"
 export JUJU_REPOSITORY="$CHARM_BASE/build"
@@ -27,11 +24,15 @@ charm build
 ## Deploy charm
 
 ```bash
-juju deploy ./charm-magnum magnum --config openstack-origin="cloud:xenial-queens"
+juju deploy ./charm-magnum magnum --config openstack-origin="cloud:bionic-train"
 
 juju add-relation magnum mysql
 juju add-relation magnum rabbitmq-server
 juju add-relation magnum:identity-service keystone:identity-service
-juju add-relation magnum:trustee-credentials keystone:trustee-credentials
+```
 
+After the charm is deployed and all relations have been established, you must run the ```domain-setup``` action to finalize the deployment. This action can be run on any unit.
+
+```bash
+juju run-action magnum/0 domain-setup
 ```
